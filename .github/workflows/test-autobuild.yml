@@ -49,11 +49,11 @@ jobs:
         shell: cmd
         run: chcp 65001
 
-      - name: Build sample/main.c with autobuildtool (non-interactive)
+      - name: Build sample/main.py with autobuildtool (non-interactive)
         shell: cmd
         run: |
           REM Pipe desired output name into the tool
-          echo sample_app.exe | .\autobuildtool.exe sample\main.c
+          echo sample_app.exe | .\autobuildtool.exe sample\main.py
 
       - name: Verify built exe exists
         shell: cmd
