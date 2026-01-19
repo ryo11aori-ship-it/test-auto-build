@@ -104,7 +104,7 @@ jobs:
             echo Build failed: sample_app.exe not found & exit /b 2
           )
 
-            - name: Run the built sample and capture stdout (with timeout guard)
+      - name: Run the built sample and capture stdout (with timeout guard)
         shell: powershell
         run: |
           Write-Host "Running sample_app.exe..."
