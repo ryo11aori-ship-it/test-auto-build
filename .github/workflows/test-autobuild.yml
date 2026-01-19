@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-run:
-    runs-on: windows-lest
+    runs-on: windows-latest
     timeout-minutes: 30
 
     steps:
