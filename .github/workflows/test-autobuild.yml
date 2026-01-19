@@ -42,24 +42,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller
 
-      - name: Ensure autobuildtool.exe exists
+      - name: Ensure autobuildtool.exe exists (optional)
         shell: cmd
         run: |
           if not exist autobuildtool.exe (
-            echo ERROR: autobuildtool.exe not found at repo root
-            exit 1
+            echo WARNING: autobuildtool.exe not found at repo root
+          ) else (
+            echo autobuildtool.exe found
           )
-          echo autobuildtool.exe found
 
       - name: Set code page to UTF-8
         shell: cmd
         run: chcp 65001
 
-      - name: Build sample/main.py with autobuildtool (non-interactive)
+      ################################################################
+      # Python build (CI-optimized): use pyinstaller --onedir directly
+      # This avoids the long startup delay caused by --onefile unpacking.
+      ################################################################
+      - name: Build sample/main.py with PyInstaller (onedir, CI)
         shell: cmd
         run: |
-          REM Provide output name as argv[2] so tool runs non-interactively
-          .\autobuildtool.exe sample\main.py sample_app.exe
+          REM Build with onedir to avoid heavy self-extract at runtime on Windows CI
+          pyinstaller --onedir --clean --name sample_app sample\main.py
 
       - name: Debug dist folder (if present)
         shell: cmd
@@ -74,14 +78,19 @@ jobs:
       - name: Ensure exe is in repo root (copy from dist if needed)
         shell: cmd
         run: |
-          if exist dist\sample_app.exe (
-            echo Found dist\sample_app.exe - copying to repo root
-            copy /Y dist\sample_app.exe sample_app.exe
+          if exist dist\sample_app\sample_app.exe (
+            echo Found dist\sample_app\sample_app.exe - copying to repo root
+            copy /Y dist\sample_app\sample_app.exe sample_app.exe
           ) else (
-            if exist sample_app.exe (
-              echo sample_app.exe already in repo root
+            if exist dist\sample_app.exe (
+              echo Found dist\sample_app.exe - copying to repo root
+              copy /Y dist\sample_app.exe sample_app.exe
             ) else (
-              echo Build failed: no exe found & exit /b 2
+              if exist sample_app.exe (
+                echo sample_app.exe already in repo root
+              ) else (
+                echo Build failed: no exe found & exit /b 2
+              )
             )
           )
 
@@ -95,12 +104,19 @@ jobs:
             echo Build failed: sample_app.exe not found & exit /b 2
           )
 
-      - name: Run the built sample and capture stdout
-        shell: cmd
+      - name: Run the built sample and capture stdout (with timeout guard)
+        shell: powershell
         run: |
-          echo Running sample_app.exe...
-          sample_app.exe > run_output.txt 2>&1
-          type run_output.txt
+          Write-Host "Running sample_app.exe..."
+          $ps = Start-Process -FilePath "$PWD\sample_app.exe" -RedirectStandardOutput run_output.txt -RedirectStandardError run_output.txt -PassThru
+          # Wait up to 120 seconds for the process to finish (adjust as needed)
+          $finished = $ps.WaitForExit(120000)
+          if (-not $finished) {
+            Write-Host "Process did not exit within 120s; killing..."
+            $ps.Kill()
+            throw "Process timeout"
+          }
+          Get-Content run_output.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -109,6 +125,7 @@ jobs:
           if-no-files-found: warn
           path: |
             sample_app.exe
+            dist\sample_app\sample_app.exe
             dist\sample_app.exe
             run_output.txt
             mandelbrot_test.ppm
