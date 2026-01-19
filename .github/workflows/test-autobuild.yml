@@ -1,4 +1,3 @@
-# .github/workflows/test-autobuild.yml
 name: Test AutoBuildTool (Windows)
 
 on:
@@ -22,6 +21,21 @@ jobs:
       - name: List repo root (debug)
         run: dir
 
+      # --- 追加: Install Zig via Chocolatey, export AUTOBUILD_ZIG and copy to tool\zig ---
+      - name: Install Zig and expose path
+        shell: powershell
+        run: |
+          choco install zig -y
+          $zig = (Get-Command zig -ErrorAction Stop).Source
+          Write-Host "Found zig at: $zig"
+          # Export env var for later steps
+          echo "AUTOBUILD_ZIG=$zig" >> $env:GITHUB_ENV
+          # Also copy into repo workspace under tool\zig\zig.exe to match local lookup
+          $dest = Join-Path $PWD "tool\zig"
+          New-Item -Path $dest -ItemType Directory -Force | Out-Null
+          Copy-Item -Path $zig -Destination (Join-Path $dest "zig.exe") -Force
+          Write-Host "Copied zig to: $dest"
+
       - name: Ensure autobuildtool.exe exists
         shell: cmd
         run: |
@@ -30,6 +44,10 @@ jobs:
             exit 1
           )
           echo "autobuildtool.exe found"
+
+      - name: Set code page to UTF-8 (optional but recommended)
+        shell: cmd
+        run: chcp 65001
 
       - name: Build sample/main.c with autobuildtool (non-interactive)
         shell: cmd
