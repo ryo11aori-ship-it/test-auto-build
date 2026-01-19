@@ -19,20 +19,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: List repo root (debug)
+        shell: cmd
         run: dir
 
-      # --- Install Zig ---
+      # --- Install Zig and expose path (for C builds) ---
       - name: Install Zig and expose path
         shell: powershell
         run: |
           choco install zig -y
           $zig = (Get-Command zig -ErrorAction Stop).Source
+          Write-Host "Found zig at: $zig"
           echo "AUTOBUILD_ZIG=$zig" >> $env:GITHUB_ENV
           $dest = Join-Path $PWD "tool\zig"
           New-Item -Path $dest -ItemType Directory -Force | Out-Null
           Copy-Item -Path $zig -Destination (Join-Path $dest "zig.exe") -Force
+          Write-Host "Copied zig to: $dest"
 
-      # --- Install PyInstaller (REQUIRED for .py) ---
+      # --- Install PyInstaller (required for .py -> exe) ---
       - name: Install PyInstaller
         shell: powershell
         run: |
@@ -43,31 +46,59 @@ jobs:
         shell: cmd
         run: |
           if not exist autobuildtool.exe (
-            echo ERROR: autobuildtool.exe not found
+            echo ERROR: autobuildtool.exe not found at repo root
             exit 1
           )
+          echo autobuildtool.exe found
 
       - name: Set code page to UTF-8
         shell: cmd
         run: chcp 65001
 
-      - name: Build sample/main.py with autobuildtool
+      - name: Build sample/main.py with autobuildtool (non-interactive)
         shell: cmd
         run: |
+          REM Provide output name as argv[2] so tool runs non-interactively
           .\autobuildtool.exe sample\main.py sample_app.exe
+
+      - name: Debug dist folder (if present)
+        shell: cmd
+        run: |
+          if exist dist (
+            echo ---- dist folder contents ----
+            dir dist
+          ) else (
+            echo dist folder not present
+          )
+
+      - name: Ensure exe is in repo root (copy from dist if needed)
+        shell: cmd
+        run: |
+          if exist dist\sample_app.exe (
+            echo Found dist\sample_app.exe - copying to repo root
+            copy /Y dist\sample_app.exe sample_app.exe
+          ) else (
+            if exist sample_app.exe (
+              echo sample_app.exe already in repo root
+            ) else (
+              echo Build failed: no exe found & exit /b 2
+            )
+          )
 
       - name: Verify built exe exists
         shell: cmd
         run: |
           if exist sample_app.exe (
+            echo Built sample_app.exe found
             dir sample_app.exe
           ) else (
-            echo Build failed & exit /b 2
+            echo Build failed: sample_app.exe not found & exit /b 2
           )
 
       - name: Run the built sample and capture stdout
         shell: cmd
         run: |
+          echo Running sample_app.exe...
           sample_app.exe > run_output.txt 2>&1
           type run_output.txt
 
@@ -75,7 +106,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-artifacts
+          if-no-files-found: warn
           path: |
             sample_app.exe
+            dist\sample_app.exe
             run_output.txt
             mandelbrot_test.ppm
