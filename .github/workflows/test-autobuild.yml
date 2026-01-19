@@ -90,7 +90,7 @@ jobs:
             echo Build failed: no exe found & exit /b 2
           )
 
-            - name: Run the built sample (launch check only)
+      - name: Run the built sample (launch check only)
         shell: powershell
         run: |
           Write-Host "Preparing to run sample_app.exe..."
