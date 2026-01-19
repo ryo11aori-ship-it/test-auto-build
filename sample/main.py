@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import io
 import time
 import math
 import json
@@ -12,6 +13,15 @@ import subprocess
 from pathlib import Path
 from statistics import mean, median
 
+try:
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", errors="replace"
+    )
+    sys.stderr = io.TextIOWrapper(
+        sys.stderr.buffer, encoding="utf-8", errors="replace"
+    )
+except Exception:
+    pass
 # -----------------------------
 # 基本情報
 # -----------------------------
