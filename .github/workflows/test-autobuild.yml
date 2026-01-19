@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-run:
-    runs-on: windows-latest
+    runs-on: windows-lest
     timeout-minutes: 30
 
     steps:
@@ -57,12 +57,10 @@ jobs:
 
       ################################################################
       # Python build (CI-optimized): use pyinstaller --onedir directly
-      # This avoids the long startup delay caused by --onefile unpacking.
       ################################################################
       - name: Build sample/main.py with PyInstaller (onedir, CI)
         shell: cmd
         run: |
-          REM Build with onedir to avoid heavy self-extract at runtime on Windows CI
           pyinstaller --onedir --clean --name sample_app sample\main.py
 
       - name: Debug dist folder (if present)
@@ -71,53 +69,62 @@ jobs:
           if exist dist (
             echo ---- dist folder contents ----
             dir dist
+            if exist dist\sample_app (
+              echo ---- dist\sample_app contents ----
+              dir dist\sample_app
+            )
           ) else (
             echo dist folder not present
           )
 
-      - name: Ensure exe is in repo root (copy from dist if needed)
+      - name: Verify built exe exists (onsite in dist or root)
         shell: cmd
         run: |
           if exist dist\sample_app\sample_app.exe (
-            echo Found dist\sample_app\sample_app.exe - copying to repo root
-            copy /Y dist\sample_app\sample_app.exe sample_app.exe
+            echo Found dist\sample_app\sample_app.exe
+          ) else if exist dist\sample_app.exe (
+            echo Found dist\sample_app.exe
+          ) else if exist sample_app.exe (
+            echo Found sample_app.exe in repo root
           ) else (
-            if exist dist\sample_app.exe (
-              echo Found dist\sample_app.exe - copying to repo root
-              copy /Y dist\sample_app.exe sample_app.exe
-            ) else (
-              if exist sample_app.exe (
-                echo sample_app.exe already in repo root
-              ) else (
-                echo Build failed: no exe found & exit /b 2
-              )
-            )
-          )
-
-      - name: Verify built exe exists
-        shell: cmd
-        run: |
-          if exist sample_app.exe (
-            echo Built sample_app.exe found
-            dir sample_app.exe
-          ) else (
-            echo Build failed: sample_app.exe not found & exit /b 2
+            echo Build failed: no exe found & exit /b 2
           )
 
       - name: Run the built sample and capture stdout (with timeout guard)
         shell: powershell
         run: |
-          Write-Host "Running sample_app.exe..."
+          Write-Host "Preparing to run sample_app.exe..."
+
+          # Determine run directory and exe path
+          if (Test-Path (Join-Path $PWD "dist\sample_app\sample_app.exe")) {
+            $runDir = Join-Path $PWD "dist\sample_app"
+            $exePath = Join-Path $runDir "sample_app.exe"
+            Write-Host "Will run from dist\sample_app"
+          } elseif (Test-Path (Join-Path $PWD "dist\sample_app.exe")) {
+            # rare case: dist\sample_app.exe
+            $runDir = Join-Path $PWD "dist"
+            $exePath = Join-Path $runDir "sample_app.exe"
+            Write-Host "Will run from dist"
+          } elseif (Test-Path (Join-Path $PWD "sample_app.exe")) {
+            $runDir = $PWD
+            $exePath = Join-Path $runDir "sample_app.exe"
+            Write-Host "Will run from repo root"
+          } else {
+            throw "No executable found to run"
+          }
+
+          Write-Host "Executable path: $exePath"
           $stdout = Join-Path $PWD "run_output.txt"
           $stderr = Join-Path $PWD "run_error.txt"
 
-          # Start process and redirect to separate files
-          $ps = Start-Process -FilePath "$PWD\sample_app.exe" `
+          # Start process within the folder where supporting files / DLLs live
+          $ps = Start-Process -FilePath $exePath `
+                               -WorkingDirectory $runDir `
                                -RedirectStandardOutput $stdout `
                                -RedirectStandardError $stderr `
                                -PassThru
 
-          # Wait up to 120 seconds (120000 ms)
+          # Wait up to 120 seconds for the process to finish
           $finished = $ps.WaitForExit(120000)
           if (-not $finished) {
             Write-Host "Process did not exit within 120s; killing..."
@@ -150,7 +157,8 @@ jobs:
           if-no-files-found: warn
           path: |
             sample_app.exe
-            dist\sample_app\sample_app.exe
+            dist\sample_app\**
             dist\sample_app.exe
             run_output.txt
+            run_error.txt
             mandelbrot_test.ppm
