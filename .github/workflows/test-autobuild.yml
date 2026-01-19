@@ -1,0 +1,63 @@
+# .github/workflows/test-autobuild.yml
+name: Test AutoBuildTool (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - 'sample/**'
+      - 'tool/**'
+      - '.github/workflows/test-autobuild.yml'
+
+jobs:
+  build-and-run:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: List repo root (debug)
+        run: dir
+
+      - name: Ensure autobuildtool.exe exists
+        run: |
+          if not exist autobuildtool.exe (
+            echo "ERROR: autobuildtool.exe not found at repo root"
+            exit 1
+          )
+          echo "autobuildtool.exe found"
+
+      - name: Build sample/main.c with autobuildtool (non-interactive)
+        shell: cmd
+        run: |
+          REM Pipe desired output name into the tool
+          echo sample_app.exe | .\autobuildtool.exe sample\main.c
+
+      - name: Verify built exe exists
+        shell: cmd
+        run: |
+          if exist sample_app.exe (
+            echo "Built sample_app.exe found"
+            dir sample_app.exe
+          ) else (
+            echo "Build failed: sample_app.exe not found" & exit /b 2
+          )
+
+      - name: Run the built sample and capture stdout
+        shell: cmd
+        run: |
+          echo Running sample_app.exe...
+          sample_app.exe > run_output.txt 2>&1
+          type run_output.txt
+
+      - name: Upload artifacts (exe, log, ppm)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            sample_app.exe
+            run_output.txt
+            mandelbrot_test.ppm
