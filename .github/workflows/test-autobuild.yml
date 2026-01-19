@@ -90,37 +90,24 @@ jobs:
             echo Build failed: no exe found & exit /b 2
           )
 
-      - name: Run the built sample (launch check only)
+            - name: Run the built sample (launch check only)
         shell: powershell
         run: |
           Write-Host "Preparing to run sample_app.exe..."
 
-    if (Test-Path "dist\sample_app\sample_app.exe") {
-      $runDir = "dist\sample_app"
-      $exePath = "$runDir\sample_app.exe"
-    } elseif (Test-Path "sample_app.exe") {
-      $runDir = "."
-      $exePath = "sample_app.exe"
-    } else {
-      throw "Executable not found"
-    }
+          if (Test-Path "dist\sample_app\sample_app.exe") {
+            $runDir = "dist\sample_app"
+            $exePath = "$runDir\sample_app.exe"
+          } elseif (Test-Path "sample_app.exe") {
+            $runDir = "."
+            $exePath = "sample_app.exe"
+          } else {
+            throw "Executable not found"
+          }
 
-    Write-Host "Launching: $exePath"
-    Start-Process -FilePath $exePath -WorkingDirectory $runDir
+          Write-Host "Launching: $exePath"
+          Start-Process -FilePath $exePath -WorkingDirectory $runDir
 
-    Start-Sleep -Seconds 5
-    Write-Host "Launch OK (CI does not wait for exit)"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-artifacts
-          if-no-files-found: warn
-          path: |
-            sample_app.exe
-            dist\sample_app\**
-            dist\sample_app.exe
-            run_output.txt
-            run_error.txt
-            mandelbrot_test.ppm
+          Start-Sleep -Seconds 5
+          Write-Host "Launch OK (CI does not wait for exit)"
     
