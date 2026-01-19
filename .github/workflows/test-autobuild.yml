@@ -23,6 +23,7 @@ jobs:
         run: dir
 
       - name: Ensure autobuildtool.exe exists
+        shell: cmd
         run: |
           if not exist autobuildtool.exe (
             echo "ERROR: autobuildtool.exe not found at repo root"
