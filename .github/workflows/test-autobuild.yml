@@ -93,7 +93,7 @@ jobs:
       - name: Run the built sample (launch check only)
         shell: powershell
         run: |
-    Write-Host "Preparing to run sample_app.exe..."
+          Write-Host "Preparing to run sample_app.exe..."
 
     if (Test-Path "dist\sample_app\sample_app.exe") {
       $runDir = "dist\sample_app"
@@ -123,3 +123,4 @@ jobs:
             run_output.txt
             run_error.txt
             mandelbrot_test.ppm
+    
