@@ -104,19 +104,44 @@ jobs:
             echo Build failed: sample_app.exe not found & exit /b 2
           )
 
-      - name: Run the built sample and capture stdout (with timeout guard)
+            - name: Run the built sample and capture stdout (with timeout guard)
         shell: powershell
         run: |
           Write-Host "Running sample_app.exe..."
-          $ps = Start-Process -FilePath "$PWD\sample_app.exe" -RedirectStandardOutput run_output.txt -RedirectStandardError run_output.txt -PassThru
-          # Wait up to 120 seconds for the process to finish (adjust as needed)
+          $stdout = Join-Path $PWD "run_output.txt"
+          $stderr = Join-Path $PWD "run_error.txt"
+
+          # Start process and redirect to separate files
+          $ps = Start-Process -FilePath "$PWD\sample_app.exe" `
+                               -RedirectStandardOutput $stdout `
+                               -RedirectStandardError $stderr `
+                               -PassThru
+
+          # Wait up to 120 seconds (120000 ms)
           $finished = $ps.WaitForExit(120000)
           if (-not $finished) {
             Write-Host "Process did not exit within 120s; killing..."
-            $ps.Kill()
+            try { $ps.Kill() } catch { Write-Host "Failed to kill process: $_" }
             throw "Process timeout"
           }
-          Get-Content run_output.txt
+
+          # Show outputs if present
+          if (Test-Path $stdout) {
+            Write-Host "---- STDOUT ----"
+            Get-Content $stdout -Raw
+          } else {
+            Write-Host "No stdout file produced."
+          }
+
+          if (Test-Path $stderr) {
+            Write-Host "---- STDERR ----"
+            Get-Content $stderr -Raw
+          }
+
+          # Fail the step if process exited with non-zero
+          if ($ps.ExitCode -ne 0) {
+            throw "Process exited with code $($ps.ExitCode)"
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
